@@ -26,7 +26,7 @@ function resize_sprites {
   COUNTER=0
   
   echo "Resizing sprites from \"$INPUT_DIR_BASE\" to \"${OUTPUT_DIR_BASE}\" (by ${PERCENT}%)..."
-  for FILE in `find "${INPUT_DIR_BASE}" -name "*.png" -print -o -name "*.jpg" -print -o -name "*.jpeg" -print`; do resize_image "${INPUT_DIR_BASE}/$(basename ${FILE})" "${OUTPUT_DIR_BASE}/$(basename ${FILE})" ${PERCENT}; let "COUNTER=( COUNTER + 1 )"; done  
+  for FILE in `find "${INPUT_DIR_BASE}" -maxdepth 1 -name "*.png" -print -o -name "*.jpg" -print -o -name "*.jpeg" -print`; do resize_image "${INPUT_DIR_BASE}/$(basename ${FILE})" "${OUTPUT_DIR_BASE}/$(basename ${FILE})" ${PERCENT}; let "COUNTER=( COUNTER + 1 )"; done  
   
   echo " done (items: $COUNTER)."
 }
@@ -39,7 +39,7 @@ function copy_optimized {
     echo "Copying optimized from \""${INPUT_DIR_BASE}"\" to \""${OUTPUT_DIR_BASE}"\"..."
     COUNTER=0
     
-    for FILE in `find "${INPUT_DIR_BASE}" -name "*.png" -print -o -name "*.jpg" -print -o -name "*.jpeg" -print`; do cp "${INPUT_DIR_BASE}/$(basename $FILE)" "${OUTPUT_DIR_BASE}/$(basename $FILE)"; let "COUNTER=( COUNTER + 1 )"; done
+    for FILE in `find "${INPUT_DIR_BASE}" -maxdepth 1 -name "*.png" -print -o -name "*.jpg" -print -o -name "*.jpeg" -print`; do cp "${INPUT_DIR_BASE}/$(basename $FILE)" "${OUTPUT_DIR_BASE}/$(basename $FILE)"; let "COUNTER=( COUNTER + 1 )"; done
     echo " done (items: $COUNTER)."
   fi
 }
@@ -51,8 +51,23 @@ function remove_images {
     echo "Removing images from \""${INPUT_DIR_BASE}"\"..."
     COUNTER=0
     
-    for FILE in `find "${INPUT_DIR_BASE}" -name "*.png" -print -o -name "*.jpg" -print -o -name "*.jpeg" -print`; do rm -f "${INPUT_DIR_BASE}/$(basename $FILE)"; let "COUNTER=( COUNTER + 1 )"; done
+    for FILE in `find "${INPUT_DIR_BASE}" -maxdepth 1 -name "*.png" -print -o -name "*.jpg" -print -o -name "*.jpeg" -print`; do rm -f "${INPUT_DIR_BASE}/$(basename $FILE)"; let "COUNTER=( COUNTER + 1 )"; done
     echo " done (items: $COUNTER)."
+  fi
+}
+
+function copy_or_resize_texture {
+  INPUT_FILE="$1"
+  OPTIMIZED_FILE="$2"
+  OUTPUT_FILE="$3"
+  PERCENT="$4"
+  
+  if [ -f "${OPTIMIZED_FILE}" ]; then
+    cp "${OPTIMIZED_FILE}" "${OUTPUT_FILE}"
+    echo "Copied optimized \"${OPTIMIZED_FILE}\" to \"${OUTPUT_FILE}\""
+  else
+    resize_image "${INPUT_FILE}" "${OUTPUT_FILE}" ${PERCENT}
+    echo "Resized \"${INPUT_FILE}\" to \"${OUTPUT_FILE}\" (${PERCENT}%)" 
   fi
 }
 
@@ -73,7 +88,16 @@ BASE_TEX_DIR="${PROJECT_DIR}/Resources/Textures"
 
 TEXTURE_TO_GEN=$1
 
-for TEX_DIR in "${BASE_IN_DIR}/size-4/*"; do
+if [ ! ${TEXTURE_TO_GEN} ]; then
+  echo "Removing old textures..."
+  
+  COUNTER=0
+  
+  for FILE in `find "${BASE_TEX_DIR}" -maxdepth 1 -name "*.png" -print -o -name "*.jpg" -print -o -name "*.jpeg" -print -o -name "*.plist" -print`; do rm -f "${BASE_TEX_DIR}/$(basename $FILE)"; let "COUNTER=( COUNTER + 1 )"; done
+  echo " done (items: $COUNTER)."
+fi
+
+for TEX_DIR in `find "${BASE_IN_DIR}/size-4" -maxdepth 1 -print`; do
   DIR_NAME=$(basename $TEX_DIR)
   if [ ! ${TEXTURE_TO_GEN} -o ${TEXTURE_TO_GEN} == ${DIR_NAME} ]; then
     if [ -d "${BASE_IN_DIR}/size-4/${DIR_NAME}" ]; then
@@ -93,3 +117,19 @@ for TEX_DIR in "${BASE_IN_DIR}/size-4/*"; do
     fi
   fi
 done
+
+for TEX_FILE in `find "${BASE_IN_DIR}/size-4" -maxdepth 1 -name "*.png" -print -o -name "*.jpg" -print -o -name "*.jpeg" -print`; do
+  TEX_FILE_NAME=$(basename $TEX_FILE)
+  TEX_FILE_NAME_NO_EXT=${TEX_FILE_NAME%.*}
+  TEX_FILE_EXT=${TEX_FILE_NAME##*.}
+  
+  if [ ! ${TEXTURE_TO_GEN} -o ${TEXTURE_TO_GEN} == ${TEX_FILE_NAME_NO_EXT} ]; then
+    copy_or_resize_texture "${TEX_FILE}" "${BASE_IN_DIR}/size-2.optimized/${TEX_FILE_NAME}" "${BASE_TEX_DIR}/${TEX_FILE_NAME_NO_EXT}-2.${TEX_FILE_EXT}" 50
+    copy_or_resize_texture "${TEX_FILE}" "${BASE_IN_DIR}/size-1.optimized/${TEX_FILE_NAME}" "${BASE_TEX_DIR}/${TEX_FILE_NAME_NO_EXT}-1.${TEX_FILE_EXT}" 25
+    cp "${TEX_FILE}" "${BASE_TEX_DIR}/${TEX_FILE_NAME_NO_EXT}-4.${TEX_FILE_EXT}"
+    
+    echo "Copied \"${TEX_FILE}\" to \"${BASE_TEX_DIR}/${TEX_FILE_NAME_NO_EXT}-4.${TEX_FILE_EXT}\""
+  fi
+done
+
+
